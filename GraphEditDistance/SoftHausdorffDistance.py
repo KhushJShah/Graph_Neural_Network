@@ -61,8 +61,8 @@ class SoftHd(nn.Module):
         bm1, _ = bdxy.min(dim=2)
         bm2, _ = bdxy.min(dim=1)
 
-        bm1.masked_fill_(node_mask.prod(dim=2), 0)
-        bm2.masked_fill_(node_mask.prod(dim=1), 0)
+        bm1.masked_fill_(node_mask.prod(dim=2).bool(), 0) 
+        bm2.masked_fill_(node_mask.prod(dim=1).bool(), 0)
 
         d = bm1.sum(dim=1) + bm2.sum(dim=1)
         

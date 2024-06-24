@@ -108,7 +108,7 @@ def siamese_accuracy(output, target):
 
 def knn(D, target, train_target, k=(1,)):
     """Computes the precision@k for the specified values of k"""
-    maxk=max(k)
+    maxk = max(k)
     batch_size = target.size(0)
     _, pred = D.topk(maxk, largest=False, sorted=True)
     pred = train_target[pred]
@@ -117,12 +117,11 @@ def knn(D, target, train_target, k=(1,)):
     res = []
     for ki in k:
         pred_k = nn_prediction(pred[:ki], axis=0)
-
         pred_k = pred_k.squeeze()
         correct_k = pred_k.eq(target.data).float().sum()
+        res.append(correct_k.item() * (100.0 / batch_size))  # Convert to float
 
-        res.append(correct_k*(100.0 / batch_size))
-    return torch.FloatTensor(res)
+    return res  # Return a list of floats
 
 
 def meanAveragePrecision(D, target, train_target):

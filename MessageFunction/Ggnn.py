@@ -13,13 +13,9 @@ from __future__ import print_function
 
 import torch
 import torch.nn as nn
-from torch.autograd.variable import Variable
-
-# Own modules
 
 __author__ = "Pau Riba"
 __email__ = "priba@cvc.uab.cat" 
-
 
 class Ggnn(nn.Module):
 
@@ -33,19 +29,19 @@ class Ggnn(nn.Module):
 
         self.edge_matix = nn.Parameter(torch.randn(len(self.e_label), self.out_size, self.in_size))
 
-
     # Message from h_v to h_w through e_vw
     # M_t(h^t_v, h^t_w, e_vw) = A_e_vw h^t_w
     def forward(self, h_v, h_w, e_vw):
 
-        m_new = Variable(torch.zeros(h_w.size(0), h_w.size(1), self.args['out']).type_as(h_w.data))
+        m_new = torch.zeros(h_w.size(0), h_w.size(1), self.args['out']).type_as(h_w.data)
 
         for i in range(len(self.e_label)):
             edge_labels = torch.nonzero(e_vw.squeeze(2) == self.e_label[i])
-            if edge_labels.size():
+            if edge_labels.size(0) > 0:
                 parameter_mat = self.edge_matix[i].unsqueeze(0).expand(edge_labels.size(0), self.edge_matix.size(1), self.edge_matix.size(2))
 
-                m_new[edge_labels[:,0],edge_labels[:,1],:] = parameter_mat.bmm(h_w[edge_labels[:,0],edge_labels[:,1],:].unsqueeze(2))
+                # Fix shape mismatch issue
+                m_new[edge_labels[:, 0], edge_labels[:, 1], :] = parameter_mat.bmm(h_w[edge_labels[:, 0], edge_labels[:, 1], :].unsqueeze(2)).squeeze(2)
 
         return m_new
 

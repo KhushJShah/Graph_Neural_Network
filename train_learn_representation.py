@@ -10,7 +10,6 @@ Learns a classifier using a Neural Message Passing network. Drops the Readout la
 # Python modules
 import torch
 import time
-from torch.autograd.variable import Variable
 import glob
 import os
 
@@ -24,7 +23,6 @@ import GraphEditDistance
 
 __author__ = "Pau Riba"
 __email__ = "priba@cvc.uab.cat"
-
 
 def train(train_loader, net, optimizer, cuda, criterion, epoch):
     batch_time = AverageMeter()
@@ -40,7 +38,6 @@ def train(train_loader, net, optimizer, cuda, criterion, epoch):
         # Prepare input data
         if cuda:
             h, am, g_size, target = h.cuda(), am.cuda(), g_size.cuda(), target.cuda()
-        h, am, g_size, target = Variable(h), Variable(am), Variable(g_size), Variable(target)
 
         # Measure data loading time
         data_time.update(time.time() - end)
@@ -53,7 +50,7 @@ def train(train_loader, net, optimizer, cuda, criterion, epoch):
         loss = criterion(output, target)
 
         # Logs
-        losses.update(loss.data[0], h.size(0))
+        losses.update(loss.item(), h.size(0))
 
         # Compute gradient and do SGD step
         loss.backward()
@@ -67,7 +64,6 @@ def train(train_loader, net, optimizer, cuda, criterion, epoch):
           .format(epoch, loss=losses, b_time=batch_time))
 
     return losses
-
 
 def validation(test_loader, net, cuda, criterion, evaluation):
     batch_time = AverageMeter()
@@ -84,7 +80,6 @@ def validation(test_loader, net, cuda, criterion, evaluation):
         # Prepare input data
         if cuda:
             h, am, g_size, target = h.cuda(), am.cuda(), g_size.cuda(), target.cuda()
-        h, am, g_size, target = Variable(h, volatile=True), Variable(am, volatile=True), Variable(g_size, volatile=True), Variable(target, volatile=True)
 
         # Measure data loading time
         data_time.update(time.time() - end)
@@ -96,8 +91,8 @@ def validation(test_loader, net, cuda, criterion, evaluation):
         bacc = evaluation(output, target)
         
         # Logs
-        losses.update(loss.data[0], h.size(0))
-        acc.update(bacc[0].data[0], h.size(0))
+        losses.update(loss.item(), h.size(0))
+        acc.update(bacc[0].item(), h.size(0))
 
         # Measure elapsed time
         batch_time.update(time.time() - end)
@@ -108,10 +103,9 @@ def validation(test_loader, net, cuda, criterion, evaluation):
 
     return losses, acc
 
-
 def test(test_loader, train_loader, net, distance, cuda, evaluation):
     batch_time = AverageMeter()
-    acc = AverageMeter()
+    acc = [AverageMeter() for _ in range(3)]
 
     eval_k = (1, 3, 5)
 
@@ -125,7 +119,6 @@ def test(test_loader, train_loader, net, distance, cuda, evaluation):
         # Prepare input data
         if cuda:
             h1, am1, g_size1, target1 = h1.cuda(), am1.cuda(), g_size1.cuda(), target1.cuda()
-        h1, am1, g_size1, target1 = Variable(h1, volatile=True), Variable(am1, volatile=True), Variable(g_size1, volatile=True), Variable(target1, volatile=True)
 
         # Compute features
         output1 = net(h1, am1, g_size1, output='nodes')
@@ -136,14 +129,13 @@ def test(test_loader, train_loader, net, distance, cuda, evaluation):
             # Prepare input data
             if cuda:
                 h2, am2, g_size2, target2 = h2.cuda(), am2.cuda(), g_size2.cuda(), target2.cuda()
-            h2, am2, g_size2, target2 = Variable(h2, volatile=True), Variable(am2, volatile=True), Variable(g_size2, volatile=True), Variable(target2, volatile=True)
 
             # Compute features
             output2 = net(h2, am2, g_size2, output='nodes')
 
             d = distance(output1.expand(h2.size(0), output1.size(1), output1.size(2)),
-                            am1.expand(am2.size(0), am1.size(1), am1.size(2), am1.size(3)),
-                            g_size1.expand(g_size2.size(0)), output2, am2, g_size2)
+                         am1.expand(am2.size(0), am1.size(1), am1.size(2), am1.size(3)),
+                         g_size1.expand(g_size2.size(0)), output2, am2, g_size2)
 
             D_aux.append(d)
             T_aux.append(target2)
@@ -154,15 +146,18 @@ def test(test_loader, train_loader, net, distance, cuda, evaluation):
         bacc = evaluation(D, target1.expand_as(train_target), train_target, k=eval_k)
 
         # Measure elapsed time
-        acc.update(bacc, h1.size(0))
+        for idx, val in enumerate(bacc):
+            acc[idx].update(val, h1.size(0))
+
         batch_time.update(time.time() - end)
         end = time.time()
 
     print('Test distance:')
     for i in range(len(eval_k)):
-        print('\t* {k}-NN; Average Acc {acc:.3f}; Avg Time x Batch {b_time.avg:.3f}'.format(k=eval_k[i], acc=acc.avg[i], b_time=batch_time))
+        print('\t* {k}-NN; Average Acc {acc_avg:.3f}; Avg Time x Batch {b_time_avg:.3f}'.format(k=eval_k[i], acc_avg=acc[i].avg, b_time_avg=batch_time.avg))
 
     return acc
+
 
 
 def main():
@@ -183,20 +178,20 @@ def main():
                                               num_workers=args.prefetch, pin_memory=True)
 
     print('Create model')
-    if args.representation=='adj':
+    if args.representation == 'adj':
         print('\t* Discrete Edges')
         net = models.MpnnGGNN(in_size=2, e=[1], hidden_state_size=args.hidden_size, message_size=args.hidden_size, n_layers=args.nlayers, discrete_edge=True, target_size=data_train.getTargetSize())
-    elif args.representation=='feat':
+    elif args.representation == 'feat':
         print('\t* Feature Edges')
         net = models.MpnnGGNN(in_size=2, e=2, hidden_state_size=args.hidden_size, message_size=args.hidden_size, n_layers=args.nlayers, discrete_edge=False, target_size=data_train.getTargetSize())
     else:
         raise NameError('Representation ' + args.representation + ' not implemented!')
 
     print('Distance')
-    if args.distance=='Hd':
+    if args.distance == 'Hd':
         print('\t* Hausdorff Distance')
         distance = GraphEditDistance.Hd()
-    elif args.distance=='SoftHd':
+    elif args.distance == 'SoftHd':
         print('\t* Soft Hausdorff Distance')
         distance = GraphEditDistance.SoftHd()
     else:
@@ -206,7 +201,7 @@ def main():
     criterion = torch.nn.NLLLoss()
     evaluation = accuracy
     optimizer = torch.optim.SGD(net.parameters(), args.learning_rate, momentum=args.momentum, weight_decay=args.decay, nesterov=True)
-    
+
     print('Check CUDA')
     if args.cuda and args.ngpu > 1:
         print('\t* Data Parallel **NOT TESTED**')
@@ -254,12 +249,12 @@ def main():
 
             logger.step()
 
-        # Load Best model to evaluate in test if we are saving it in a checkpoint
-        if args.save is not None:
-            print('Loading best model to test')
-            best_model_file = os.path.join(args.save, 'checkpoint.pth')
-            checkpoint = load_checkpoint(best_model_file)
-            net.load_state_dict(checkpoint['state_dict'])
+        # Load Best model to evaluate in test if we are saving it in a
+            if args.save is not None:
+              print('Loading best model to test')
+              best_model_file = os.path.join(args.save, 'checkpoint.pth')
+              checkpoint = load_checkpoint(best_model_file)
+              net.load_state_dict(checkpoint['state_dict'])
 
     # Evaluate best model in Test
     print('Test:')
@@ -274,15 +269,14 @@ def main():
         if not os.path.exists(args.write):
             os.makedirs(args.write)
 
-        directed = False if args.representation=='adj' else True
+        directed = False if args.representation == 'adj' else True
         
         # Train
-        write_dataset(data_train, net, args.ngpu>0, directed)
+        write_dataset(data_train, net, args.ngpu > 0, directed)
         # Validation
-        write_dataset(data_valid, net, args.ngpu>0, directed)
+        write_dataset(data_valid, net, args.ngpu > 0, directed)
         # Test
-        write_dataset(data_test, net, args.ngpu>0, directed)
-
+        write_dataset(data_test, net, args.ngpu > 0, directed)
 
 def write_dataset(data, net, cuda, directed):
     for i in range(len(data)):
@@ -293,17 +287,15 @@ def write_dataset(data, net, cuda, directed):
 
         if cuda:
             v, am, g_size = v.cuda(), am.cuda(), g_size.cuda()
-        v, am = Variable(v, volatile=True), Variable(am, volatile=True)
         # Compute features
         v = net(v, am, g_size, output='nodes')
 
         v, am = v.squeeze(0).data, am.squeeze(0).data
 
-        write_gxl( v, am, args.write + data.getId(i), directed)
-
+        write_gxl(v, am, args.write + data.getId(i), directed)
 
 def adjust_learning_rate(optimizer, epoch):
-    """Updates the learning rate given an schedule and a gamma parameter.
+    """Updates the learning rate given a schedule and a gamma parameter.
     """
     if epoch in args.schedule:
         args.learning_rate *= args.gamma
@@ -319,15 +311,14 @@ if __name__ == '__main__':
     
     # Check Test and load
     if args.test and args.load is None:
-        raise Exception('Cannot test withoud loading a model.')
+        raise Exception('Cannot test without loading a model.')
 
     if not args.test:
         print('Initialize logger')
         log_dir = args.log + '{}_run-batchSize_{}/' \
-                .format(len(glob.glob(args.log + '*_run-batchSize_{}'.format(args.batch_size))),args.batch_size)
+            .format(len(glob.glob(args.log + '*_run-batchSize_{}'.format(args.batch_size))), args.batch_size)
 
         # Create Logger
         logger = Logger(log_dir, force=True)
 
     main()
-
