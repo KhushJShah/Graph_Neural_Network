@@ -13,8 +13,6 @@ from __future__ import print_function
 
 import torch
 import torch.nn as nn
-from torch.autograd.variable import Variable
-
 import numpy as np
 
 # Own modules
@@ -44,11 +42,6 @@ class SoftHd(nn.Module):
                                                                                     bdxy.size(1),
                                                                                     bdxy.size(2)).long()
 
-        if v1.is_cuda:
-            node_mask1 = node_mask1.cuda()
-            node_mask2 = node_mask2.cuda()
-        node_mask1 = Variable(node_mask1, requires_grad=False)
-        node_mask2 = Variable(node_mask2, requires_grad=False)
         node_mask1 = (node_mask1 >= sz1.unsqueeze(-1).unsqueeze(-1).expand_as(node_mask1))
         node_mask2 = (node_mask2 >= sz2.unsqueeze(-1).unsqueeze(-1).expand_as(node_mask2))
 
@@ -66,5 +59,4 @@ class SoftHd(nn.Module):
 
         d = bm1.sum(dim=1) + bm2.sum(dim=1)
         
-        return d/(sz1.float()+sz2.float())
-
+        return d / (sz1.float() + sz2.float())

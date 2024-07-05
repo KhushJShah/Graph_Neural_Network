@@ -27,7 +27,7 @@ __author__ = "Pau Riba"
 __email__ = "priba@cvc.uab.cat"
 
 
-def train(train_loader, net, optimizer, cuda, criterion, epoch):
+def train(train_loader, net, optimizer, criterion, epoch):
     batch_time = AverageMeter()
     data_time = AverageMeter()
     losses = AverageMeter()
@@ -38,12 +38,6 @@ def train(train_loader, net, optimizer, cuda, criterion, epoch):
     end = time.time()
 
     for i, (h1, am1, g_size1, h2, am2, g_size2, target) in enumerate(train_loader):
-        # Prepare input data
-        if cuda:
-            h1, am1, g_size1 = h1.cuda(), am1.cuda(), g_size1.cuda()
-            h2, am2, g_size2 = h2.cuda(), am2.cuda(), g_size2.cuda()
-            target = target.cuda()
-
         # Measure data loading time
         data_time.update(time.time() - end)
 
@@ -75,7 +69,7 @@ def train(train_loader, net, optimizer, cuda, criterion, epoch):
     return losses
 
 
-def validation(test_loader, net, cuda, criterion, evaluation):
+def validation(test_loader, net, criterion, evaluation):
     batch_time = AverageMeter()
     data_time = AverageMeter()
     losses = AverageMeter()
@@ -87,12 +81,6 @@ def validation(test_loader, net, cuda, criterion, evaluation):
     end = time.time()
 
     for i, (h1, am1, g_size1, h2, am2, g_size2, target) in enumerate(test_loader):
-        # Prepare input data
-        if cuda:
-            h1, am1, g_size1 = h1.cuda(), am1.cuda(), g_size1.cuda()
-            h2, am2, g_size2 = h2.cuda(), am2.cuda(), g_size2.cuda()
-            target = target.cuda()
-
         # Measure data loading time
         data_time.update(time.time() - end)
 
@@ -120,7 +108,7 @@ def validation(test_loader, net, cuda, criterion, evaluation):
     return losses, acc
 
 
-def test(test_loader, train_loader, net, cuda, evaluation):
+def test(test_loader, train_loader, net, evaluation):
     batch_time = AverageMeter()
     acc = [AverageMeter() for _ in range(3)]  # Create a list of AverageMeter instances for each k
 
@@ -132,20 +120,12 @@ def test(test_loader, train_loader, net, cuda, evaluation):
     end = time.time()
 
     for i, (h1, am1, g_size1, target1) in enumerate(test_loader):
-        # Prepare input data
-        if cuda:
-            h1, am1, g_size1, target1 = h1.cuda(), am1.cuda(), g_size1.cuda(), target1.cuda()
-
         # Compute features
         output1 = net(h1, am1, g_size1)
 
         D_aux = []
         T_aux = []
         for j, (h2, am2, g_size2, target2) in enumerate(train_loader):
-            # Prepare input data
-            if cuda:
-                h2, am2, g_size2, target2 = h2.cuda(), am2.cuda(), g_size2.cuda(), target2.cuda()
-
             # Compute features
             output2 = net(h2, am2, g_size2)
 
@@ -207,15 +187,6 @@ def main():
     criterion = LossFunction.ContrastiveLoss()
     evaluation = siamese_accuracy
     optimizer = torch.optim.SGD(net.parameters(), args.learning_rate, momentum=args.momentum, weight_decay=args.decay, nesterov=True)
-    
-    print('Check CUDA')
-    if args.cuda and args.ngpu > 1:
-        print('\t* Data Parallel **NOT TESTED**')
-        net = torch.nn.DataParallel(net, device_ids=list(range(args.ngpu)))
-
-    if args.cuda:
-        print('\t* CUDA')
-        net = net.cuda()
 
     start_epoch = 0
     best_acc = 0
@@ -234,8 +205,8 @@ def main():
             # update the optimizer learning rate
             adjust_learning_rate(optimizer, epoch)
 
-            loss_train = train(train_loader, net, optimizer, args.ngpu > 0, criterion, epoch)
-            loss_valid, acc_valid = validation(valid_loader, net, args.ngpu > 0, criterion, evaluation)
+            loss_train = train(train_loader, net, optimizer, criterion, epoch)
+            loss_valid, acc_valid = validation(valid_loader, net, criterion, evaluation)
 
             # Save model
             if args.save is not None:
@@ -262,7 +233,7 @@ def main():
 
     # Evaluate best model in Test
     print('Test:')
-    loss_test, acc_test = validation(test_loader, net, args.ngpu > 0, criterion, evaluation)
+    loss_test, acc_test = validation(test_loader, net, criterion, evaluation)
 
     # Dataset not siamese for test
     data_train, data_valid, data_test = datasets.load_data(args.dataset, args.data_path, args.representation, args.normalization)
@@ -274,7 +245,7 @@ def main():
                                               batch_size=1, collate_fn=datasets.collate_fn_multiple_size,
                                               num_workers=args.prefetch, pin_memory=True)
     print('Test k-NN classifier')
-    acc_test_hd = test(test_loader, train_loader, net, args.ngpu > 0, knn)
+    acc_test_hd = test(test_loader, train_loader, net, knn)
 
     if args.write is not None:
         if not os.path.exists(args.write):
@@ -283,22 +254,20 @@ def main():
         directed = False if args.representation == 'adj' else True
         
         # Train
-        write_dataset(data_train, net, args.ngpu > 0, directed)
+        write_dataset(data_train, net, directed)
         # Validation
-        write_dataset(data_valid, net, args.ngpu > 0, directed)
+        write_dataset(data_valid, net, directed)
         # Test
-        write_dataset(data_test, net, args.ngpu > 0, directed)
+        write_dataset(data_test, net, directed)
 
 
-def write_dataset(data, net, cuda, directed):
+def write_dataset(data, net, directed):
     for i in range(len(data)):
         v, am, _ = data[i]
         g_size = torch.LongTensor([v.size(0)])
 
         v, am = v.unsqueeze(0), am.unsqueeze(0)
 
-        if cuda:
-            v, am, g_size = v.cuda(), am.cuda(), g_size.cuda()
         # Compute features
         v = net(v, am, g_size, output='nodes')
 
@@ -319,9 +288,6 @@ if __name__ == '__main__':
     # Parse options
     args = Options().parse()
 
-    # Check cuda
-    args.cuda = args.ngpu > 0 and torch.cuda.is_available()
-    
     # Check Test and load
     if args.test and args.load is None:
         raise Exception('Cannot test without loading a model.')

@@ -13,7 +13,6 @@ from __future__ import print_function
 
 import torch
 import torch.nn as nn
-from torch.autograd.variable import Variable
 import numpy as np
 # Own modules
 
@@ -42,10 +41,6 @@ class Hd(nn.Module):
         node_mask1 = torch.arange(0, bdxy.size(2)).unsqueeze(0).unsqueeze(0).expand(bdxy.size(0),
                                                                                                  bdxy.size(1),
                                                                                                  bdxy.size(2)).long()
-
-        if v1.is_cuda:
-            node_mask1 = node_mask1.cuda()
-            node_mask2 = node_mask2.cuda()
 
         node_mask1 = (node_mask1 >= sz1.unsqueeze(-1).unsqueeze(-1).expand_as(node_mask1))
         node_mask2 = (node_mask2 >= sz2.unsqueeze(-1).unsqueeze(-1).expand_as(node_mask2))

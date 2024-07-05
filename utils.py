@@ -121,6 +121,8 @@ def knn(D, target, train_target, k=(1,)):
         correct_k = pred_k.eq(target.data).float().sum()
         res.append(correct_k.item() * (100.0 / batch_size))  # Convert to float
 
+    if isinstance(res, float):
+        res = [res]
     return res  # Return a list of floats
 
 
