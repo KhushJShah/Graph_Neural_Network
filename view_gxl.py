@@ -1,4 +1,6 @@
 import xml.etree.ElementTree as ET
+import networkx as nx
+import matplotlib.pyplot as plt
 
 def read_gxl(file_path):
     try:
@@ -42,10 +44,32 @@ def read_gxl(file_path):
         for from_node, to_node in edges:
             print(f"From: {from_node}, To: {to_node}")
 
+        return nodes, edges
+
     except ET.ParseError as e:
         print(f"Error parsing the GXL file: {e}")
     except Exception as e:
         print(f"An error occurred: {e}")
+
+def visualize_graph(nodes, edges):
+    G = nx.Graph()
+
+    # Add nodes with their attributes
+    for node_id, attrs in nodes.items():
+        G.add_node(node_id, **attrs)
+
+    # Add edges
+    for from_node, to_node in edges:
+        G.add_edge(from_node, to_node)
+
+    # Extract positions for nodes
+    pos = {node_id: (attrs['x'], attrs['y']) for node_id, attrs in nodes.items()}
+
+    # Draw the graph
+    nx.draw(G, pos, with_labels=True, node_size=500, node_color='lightblue', font_size=10, font_weight='bold')
+    plt.show()
+
 # Example usage
-file_path = "C:/Users/nupur/computer/Desktop/ggdlib-main/ggdlib-main/data/Letter/LOW/AP1_0001.gxl"
-read_gxl(file_path)
+file_path = "C:/Users/nupur/computer/Desktop/ggdlib-main/ggdlib-main/data/Letter/LOW/AP1_0002.gxl"
+nodes, edges = read_gxl(file_path)
+visualize_graph(nodes, edges)
