@@ -55,14 +55,31 @@ class LettersSiamese(data.Dataset):
         self.unique_labels = np.unique(self.labels)
         self.labels = [np.where(target == self.unique_labels)[0][0] for target in self.labels]
 
+        # Create all possible pairs of graphs
         self.pairs = list(itertools.permutations(range(len(self.labels)), 2))
         self.representation = representation
         self.normalization = normalization
 
-        pair_label = np.array([self.labels[p[0]]==self.labels[p[1]] for p in self.pairs])
+        # Create label for each pair: 1 if same class, 0 if different class
+        pair_label = np.array([self.labels[p[0]] == self.labels[p[1]] for p in self.pairs], dtype=int)
+
+        # Calculate weights to balance positive and negative samples
+        positive_pairs = (pair_label == 1).sum()
+        negative_pairs = (pair_label == 0).sum()
+
+        # Avoid division by zero
         self.weight = np.zeros(len(pair_label))
-        self.weight[pair_label] = 1.0/pair_label.sum()
-        self.weight[np.invert(pair_label)] = 1.0/np.invert(pair_label).sum()
+        if positive_pairs > 0:
+            self.weight[pair_label == 1] = 1.0 / positive_pairs
+        else:
+            print("Warning: No positive pairs found!")
+
+        if negative_pairs > 0:
+            self.weight[pair_label == 0] = 1.0 / negative_pairs
+        else:
+            print("Warning: No negative pairs found!")
+
+
 
     def __getitem__(self, index):
         ind = self.pairs[index]
@@ -85,6 +102,7 @@ class LettersSiamese(data.Dataset):
         if self.normalization:
             node_labels2 = du.normalize_mean(node_labels2)
 
+        # Target: 1 if same class, 0 if different class
         target = torch.FloatTensor([1.0]) if target1 == target2 else torch.FloatTensor([0.0])
 
         return node_labels1, am1, node_labels2, am2, target
@@ -97,6 +115,7 @@ class LettersSiamese(data.Dataset):
 
     def getWeights(self):
         return self.weight
+
 
 
 def getFileList(file_path):

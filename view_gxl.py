@@ -70,6 +70,6 @@ def visualize_graph(nodes, edges):
     plt.show()
 
 # Example usage
-file_path = "C:/Users/nupur/computer/Desktop/ggdlib-main/ggdlib-main/data/Letter/LOW/AP1_0002.gxl"
+file_path = "C:/Users/nupur/computer/Desktop/ggdlib-main/ggdlib-main/data/Letter/LOW/ZP1_0002.gxl"
 nodes, edges = read_gxl(file_path)
 visualize_graph(nodes, edges)

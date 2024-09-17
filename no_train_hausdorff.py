@@ -52,7 +52,7 @@ def test(test_loader, train_loader, net, evaluation):
         for idx, val in enumerate(bacc):
             if isinstance(val, torch.Tensor):
                 val = val.item()  # Convert to float if it's a tensor
-            print(f"Updating acc[{idx}] with value {val} (type: {type(val)})")
+            
             acc[idx].update(val, h1.size(0))
 
         batch_time.update(time.time() - end)
@@ -62,12 +62,6 @@ def test(test_loader, train_loader, net, evaluation):
         for idx, meter in enumerate(acc):
             print(f"Type of acc[{idx}]: {type(meter)}")
 
-    # Debugging: Print the contents of acc
-    for i, a in enumerate(acc):
-        print(f"acc[{i}]: val={a.val}, avg={a.avg}, sum={a.sum}, count={a.count}")
-
-    # Final type check before printing
-    print(f"Type of acc just before printing: {[type(m) for m in acc]}")
 
     print('Test distance:')
     for i in range(len(eval_k)):

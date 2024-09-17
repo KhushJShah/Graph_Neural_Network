@@ -121,7 +121,7 @@ def validation(test_loader, net, distance, cuda, criterion, evaluation):
             target = target.cuda()
         h1, am1, g_size1 = Variable(h1, volatile=True), Variable(am1, volatile=True), Variable(g_size1, volatile=True)
         h2, am2, g_size2 = Variable(h2, volatile=True), Variable(am2, volatile=True), Variable(g_size2, volatile=True)
-        target = Variable(target, volatile=True)
+        target = Variable(target,volatile=True)
 
         # Measure data loading time
         data_time.update(time.time() - end)
